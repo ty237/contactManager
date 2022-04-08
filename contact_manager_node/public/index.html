@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style type="text/css">
+        #heading {
+            margin: 0;
+            background-color: papayawhip;
+        }
+
+        .verifyMessage {
+            color: red;
+            display: none;
+        }
+
+        #controls {
+            text-align: center;
+            background-color: cadetblue;
+        }
+
+        #newContact {
+            display: inline-block;
+            margin: 20px 60px 20px 20px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: 10;
+            color: whitesmoke;
+            width: 300px;
+            height: 70px;
+            background-color: orange;
+        }
+
+        #create {
+            background-color: #02c033;
+        }
+
+        #edit {
+            background-color: lemonchiffon;
+        }
+
+        label {
+            margin: 20px;
+            display: block;
+        }
+
+        .button {
+            margin: 0;
+            padding: 0;
+            display: inline-block;
+            width: 100px;
+            height: 45px;
+            border: 10px solid red;
+        }
+
+        form {
+            display: none;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.0.5/handlebars.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", (e) => {
+        let model = (function () {
+          return {
+            getFormData(form) {
+              let obj = {};
+              for (let pair of (new FormData(form)).entries()) {
+                obj[pair[0]] = pair[1];
+              }
+              return obj;
+            },
+            delete(id) {
+              let request = new XMLHttpRequest();
+              request.open("DELETE", `http://localhost:3000/api/contacts/${parseInt(id)}`);
+              return new Promise((resolve, _reject) => {
+                request.addEventListener("load", (_e) => {
+                  resolve();
+                });
+                request.send();
+              });
+            },
+            addContact(form) {
+              let jsonObj = this.getFormData(form);
+              let request = new XMLHttpRequest();
+              request.open("POST", "http://localhost:3000/api/contacts/");
+              request.setRequestHeader('content-type', 'application/json');
+              let data = JSON.stringify(jsonObj);
+              return new Promise((resolve, reject) => {
+                request.addEventListener("load", (_e) => {
+                  resolve();
+                });
+                request.send(data);
+              });
+            },
+            updateContact(form) {
+              let jsonObj = this.getFormData(form);
+              let request = new XMLHttpRequest();
+              let el_id = form.getAttribute("data-id");
+              jsonObj.id = el_id;
+              request.open("PUT", `http://localhost:3000/api/contacts/${el_id}`);
+              request.setRequestHeader('content-type', 'application/json');
+              let data = JSON.stringify(jsonObj);
+              return new Promise((resolve, reject) => {
+                request.addEventListener("load", (_e) => {
+                  resolve();
+                });
+                request.send(data);
+              });
+            },
+            fetchContacts() {
+              let request = new XMLHttpRequest();
+              request.open("GET", "http://localhost:3000/api/contacts/");
+              request.responseType = "json";
+              return new Promise((resolve, _reject) => {
+                request.addEventListener("load", (e) => {
+                  resolve(request.response);
+                });
+                request.send();
+              });
+            }
+          };
+        })();
+        let view = (function () {
+          return {
+            updateEditForm(currLi) {
+              $currLi = $(currLi);
+              $("#edit").find(".full_name").val($currLi.find(".full_name").text());
+              $("#edit").find(".email").val($currLi.find(".email").text());
+              $("#edit").find(".phone_number").val($currLi.find(".phone_number").text());
+              $("#edit").find(".tags").val($currLi.find(".tags").text());
+              document.querySelector("#edit").setAttribute("data-id", currLi.getAttribute("data-id"));
+            },
+            createTagArray(obj) {
+              let tagArray = [];
+              if (obj.tags !== null) {
+                let names = obj.tags.split(", ");
+                for (let i = 0; i < names.length; i++) {
+                  tagArray.push(names[i]);
+                }
+              }
+              return tagArray;
+            },
+            async renderTaggedContacts() {
+              let contacts = await model.fetchContacts();
+              let conts = $("#listedContacts");
+              let filled = false;
+              for (let i = 0; i < contacts.length; i++) {
+                let obj = contacts[i];
+                obj.tags = this.createTagArray(obj);
+                if (obj.tags.includes(this.currentTag)) {
+                  filled = true;
+                  conts.append(this.template(obj));
+                }
+              }
+              document.querySelector("#tagMessage").style.display = "block";
+              if (filled) {
+                document.querySelector("#tagMessage").textContent = `All contacts with tag ${this.currentTag}`;
+              } else {
+                document.querySelector("#tagMessage").textContent = `No contacts matched ${this.currentTag}`;
+              }
+            },
+            async renderContacts() {
+              if (this.currentTag !== "") {
+                this.renderTaggedContacts();
+                return;
+              }
+              let contacts = await model.fetchContacts();
+              let matchStr = document.querySelector("#search").value.toLowerCase();
+              let conts = $("#listedContacts");
+              let filled = false;
+              for (let i = 0; i < contacts.length; i++) {
+                if (matchStr === "" || contacts[i].full_name.toLowerCase().match(matchStr) !== null) {
+                  filled = true;
+                  let obj = contacts[i];
+                  let tagArray = [];
+                  if (obj.tags !== null) {
+                    let names = obj.tags.split(", ");
+                    for (let i = 0; i < names.length; i++) {
+                      tagArray.push(names[i]);
+                    }
+                  }
+                  obj.tags = tagArray;
+                  conts.append(this.template(obj));
+                }
+              }
+              if (matchStr === "") {
+                document.querySelector("#contactMessage").style.display = "block";
+                return;
+              }
+              if (!filled) {
+                document.querySelector("#contactMessage").style.display = "block";
+                document.querySelector("#contactMessage bold").textContent = document.querySelector("#search").value.toLowerCase();
+              } else {
+                document.querySelector("#contactMessage").style.display = "none";
+              }
+            },
+            cleanPage() {
+              $("#listedContacts").empty();
+              $(".verifyMessage").hide();
+              document.querySelector("#tagMessage").style.display = "none";
+              document.querySelector("#contactMessage").style.display = "none";
+              document.querySelector("#create").reset();
+              document.querySelector("#edit").reset();
+            },
+            reset() {
+              this.cleanPage();
+              this.renderContacts();
+            },
+            factoryReset() {
+              document.querySelector("#create").style.display = "none";
+              document.querySelector("#edit").style.display = "none";
+              document.querySelector("#contacts").style.display = "block";
+              this.currentTag = "";
+              document.querySelector("#search").value = "";
+              this.reset();
+            },
+            switchTag(tag) {
+              this.currentTag = tag;
+              this.cleanPage();
+            },
+            hideContacts() {
+              document.querySelector("#contacts").style.display = "none";
+            },
+            displayCreate() {
+              document.querySelector("#create").style.display = "block";
+            },
+            displayEdit() {
+              document.querySelector("#edit").style.display = "block";
+            },
+            init() {
+              this.template = Handlebars.compile($("#template").text());
+              this.factoryReset();
+            }
+          };
+        })();
+        let controller = (function () {
+          return {
+            validate(form) {
+              let valid = true;
+              if (form.querySelector(".full_name").value === "") {
+                valid = false;
+                form.querySelector(".full_name").nextElementSibling.style.display = "block";
+                form.querySelector(".full_name").nextElementSibling.textContent = "Must enter a name!";
+              } else {
+                form.querySelector(".full_name").nextElementSibling.style.display = "none";
+              }
+
+              let emailVal = form.querySelector(".email").value;
+              const reg = new RegExp('.@.');
+              if (emailVal === ""  || !reg.test(emailVal)) {
+                valid = false;
+                form.querySelector(".email").nextElementSibling.style.display = "block";
+                form.querySelector(".email").nextElementSibling.textContent = "Must enter a valid email!";
+              } else {
+                form.querySelector(".email").nextElementSibling.style.display = "none";
+              }
+              let numberVal = form.querySelector(".phone_number").value;
+              const secondReg = new RegExp('[1-9]{3}-[1-9]{3}-[1-9]{4}');
+              if ("" || !secondReg.test(numberVal)) {
+                valid = false;
+                form.querySelector(".phone_number").nextElementSibling.style.display = "block";
+                form.querySelector(".phone_number").nextElementSibling.textContent = "Must enter a valid phone number XXX-XXX-XXXX";
+              } else {
+                form.querySelector(".phone_number").nextElementSibling.style.display = "none";
+              }
+              return valid;
+            },
+            bindListeners() {
+              document.querySelector("#heading").addEventListener("click", (e) => {
+                view.factoryReset();
+              });
+              document.querySelector("#newContact").addEventListener("click", (e) => {
+                e.preventDefault();
+                view.hideContacts();
+                view.displayCreate();
+              });
+              document.querySelector("#forms").addEventListener("click", (e) => {
+                if (e.target.classList.contains("cancel")) {
+                  e.preventDefault();
+                  view.factoryReset();
+                }
+              });
+              document.querySelector("#contacts").addEventListener("click", async (e) => {
+                if (e.target.classList.contains("edit")) {
+                  view.updateEditForm(e.target.parentElement);
+                  view.hideContacts();
+                  view.displayEdit();
+                } else if (e.target.classList.contains("delete")) {
+                  if (confirm("Are you sure you want to delete this contact?")) {
+                    await model.delete(e.target.parentElement.getAttribute("data-id"));
+                    view.reset();
+                  }
+                }
+              });
+              document.querySelector("#create").addEventListener("submit", async (e) => {
+                e.preventDefault();
+                let valid = this.validate(document.querySelector("#create"));
+                if (valid) {
+                  await model.addContact(document.querySelector("#create"));
+                  view.factoryReset();
+                }
+              });
+              document.querySelector("#edit").addEventListener("submit", async (e) => {
+                e.preventDefault();
+                let valid = this.validate(document.querySelector("#edit"));
+                if (valid) {
+                  await model.updateContact(document.querySelector("#edit"));
+                  view.factoryReset();
+                }
+              });
+              document.querySelector("#search").addEventListener("keyup", (e) => {
+                view.switchTag("");
+                view.reset();
+              });
+              document.querySelector("#contacts").addEventListener("click", (e) => {
+                if (e.target.classList.contains("tag")) {
+                  e.preventDefault();
+                  view.switchTag(e.target.textContent);
+                  view.renderTaggedContacts();
+                }
+              });
+            },
+            init() {
+              this.bindListeners();
+              view.init();
+            }
+          };
+        })();
+        controller.init();
+      });
+    </script>
+    <script id="template" type="text/x-handlebars">
+        <li data-id="{{id}}">
+            <h3><span class="full_name">{{full_name}}</span></h3>
+            <p>Phone Number: <span class="phone_number">{{phone_number}}</span></p>
+            <p>Email: <span class="email">{{email}}</span></p>
+            <p id="tags">
+                {{#each tags}}
+                    <a class="tag" href="/">{{this}}</a>
+                {{/each}}
+            </p>
+            <button class="button edit">Edit</button>
+            <button class="button delete">Delete</button>
+        </li>
+    </script>
+</head>
+<body>
+<header id="heading">
+    <h1>Contact Manager</h1>
+    <p>A description of this app</p>
+</header>
+<div id="contacts">
+    <div id="controls">
+        <button id="newContact">Create New Contact</button>
+        <input id="search" type="text" style="display:inline-block">
+    </div>
+    <p id="tagMessage" style="display: none">HEREIMHERE</p>
+    <ul id="listedContacts">
+    </ul>
+    <p id="contactMessage" style="display: none">There is no contacts starting with
+        <bold></bold>
+        .
+    </p>
+</div>
+<div id="forms">
+    <form id="create">
+        <h3>Create Contact</h3>
+        <label>Full Name:
+            <input class="full_name" type="text" name="full_name">
+            <p class="verifyMessage"></p>
+        </label>
+        <label>Email Address:
+            <input class="email" type="text" name="email">
+            <p class="verifyMessage"></p>
+        </label>
+        <label>Telephone Number:
+            <input class="phone_number" type="text" name="phone_number">
+            <p class="verifyMessage"></p>
+        </label>
+        <label>Comma Seperated Tags:
+            <input class="tags" type="text" name="tags">
+            <p class="verifyMessage"></p>
+        </label>
+        <input type="submit" class="button">
+        <button class="button cancel">Cancel</button>
+    </form>
+
+    <form id="edit" action="/">
+        <h3>Update Contact</h3>
+        <label>Full Name:
+            <input class="full_name" type="text" name="full_name">
+            <p class="verifyMessage"></p>
+        </label>
+        <label>Email Address:
+            <input class="email" type="text" name="email">
+            <p class="verifyMessage"></p>
+        </label>
+        <label>Telephone Number:
+            <input class="phone_number" type="text" name="phone_number">
+            <p class="verifyMessage"></p>
+        </label>
+        <label>Comma Seperated Tags:
+            <input class="tags" type="text" name="tags">
+            <p class="verifyMessage"></p>
+        </label>
+        <input type="submit" class="button" value="Submit">
+        <button class="button cancel">Cancel</button>
+    </form>
+</div>
+</body>
+</html>
