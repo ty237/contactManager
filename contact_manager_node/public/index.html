@@ -184,10 +184,7 @@
                   conts.append(this.template(obj));
                 }
               }
-              if (matchStr === "") {
-                document.querySelector("#contactMessage").style.display = "block";
-                return;
-              }
+              if (matchStr === "") return;
               if (!filled) {
                 document.querySelector("#contactMessage").style.display = "block";
                 document.querySelector("#contactMessage bold").textContent = document.querySelector("#search").value.toLowerCase();

@@ -2,15 +2,15 @@
   {
     "full_name": "Tyler",
     "phone_number": "415-214-5683",
-    "email": "tyschopen@gmail.com",
-    "tags": "",
-    "id": 5
+    "email": "ty@gmail.com",
+    "tags": "tyler, schopen",
+    "id": 1
   },
   {
-    "full_name": "Tyler",
-    "phone_number": "415-214-5683",
-    "email": "ty@gmail",
-    "tags": "tyler dean",
-    "id": 6
+    "full_name": "Gage",
+    "phone_number": "415-312-6783",
+    "email": "gage@gmail.com",
+    "tags": "gage, schopen",
+    "id": 2
   }
 ]
